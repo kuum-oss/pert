@@ -13,17 +13,24 @@ public class TranslationSession {
     private StringBuilder translatedBuffer = new StringBuilder();
     private final HtmlChunker chunker = new HtmlChunker();
 
-    // В TranslationSession.java измените AI_PROMPT:
-    private static final String PROMPT =
-            "Ты — профессиональный локализатор книг. Переведи текст внутри HTML на русский язык. " +
-                    "СТРОГО ЗАПРЕЩЕНО: " +
-                    "1. Изменять ссылки, атрибуты xmlns, href, src. " +
-                    "2. Добавлять любые символы [ ] или ( ) вокруг ссылок. " +
-                    "3. Менять структуру тегов <head> и <html>. " +
-                    "Выдай ТОЛЬКО исправленный код без комментариев.\n\nТекст для перевода:\n";
+    private String glossary = "";
+    private String styleInstruction = "Художественный";
+
     public TranslationSession(List<File> files) {
         this.files = files;
         loadNextFile();
+    }
+
+    // НОВЫЙ МЕТОД ДЛЯ ВОССТАНОВЛЕНИЯ СЕССИИ
+    public void restoreProgress(int fileIdx, int chunkIdx) {
+        this.curFileIdx = fileIdx;
+        loadNextFile();
+        this.curChunkIdx = chunkIdx;
+    }
+
+    public void updateSettings(String glossary, String style) {
+        this.glossary = glossary;
+        this.styleInstruction = style;
     }
 
     private void loadNextFile() {
@@ -38,7 +45,17 @@ public class TranslationSession {
     }
 
     public boolean hasMore() { return curFileIdx < files.size(); }
-    public String getPromptChunk() { return PROMPT + chunks.get(curChunkIdx); }
+
+    public String getPromptChunk() {
+        String finalPrompt = "Ты — профессиональный локализатор книг. Стиль перевода: " + styleInstruction + ".\n";
+        if (glossary != null && !glossary.trim().isEmpty()) {
+            finalPrompt += "ИСПОЛЬЗУЙ СЛЕДУЮЩИЙ ГЛОССАРИЙ (Имена и термины должны переводиться строго так):\n" + glossary + "\n";
+        }
+        finalPrompt += "СТРОГО ЗАПРЕЩЕНО: 1. Изменять ссылки, атрибуты xmlns, href, src. 2. Добавлять [ ] или ( ) вокруг ссылок. 3. Менять структуру тегов <head> и <html>.\n";
+        finalPrompt += "Выдай ТОЛЬКО исправленный HTML код без комментариев.\n\nТекст для перевода:\n";
+        return finalPrompt + chunks.get(curChunkIdx);
+    }
+
     public String getRawChunk() { return chunks.get(curChunkIdx); }
 
     public void apply(String translated) {
@@ -54,5 +71,6 @@ public class TranslationSession {
     }
 
     public int getCurIdx() { return curFileIdx; }
+    public int getCurChunkIdx() { return curChunkIdx; } // Геттер чанка
     public int getTotal() { return files.size(); }
 }
